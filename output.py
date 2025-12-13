@@ -1,0 +1,152 @@
+"""Output module for displaying and saving stock selection results"""
+
+import json
+import os
+from datetime import datetime
+from typing import List, Dict
+
+from config import RESULTS_DIR
+
+
+class OutputHandler:
+    """Handles console output and JSON file saving"""
+
+    @staticmethod
+    def print_header():
+        """Print script header"""
+        print("\n" + "=" * 60)
+        print("NIFTY50 STOCK SELECTOR - Swing Trading")
+        print(f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print("=" * 60 + "\n")
+
+    @staticmethod
+    def print_summary(
+        total_stocks: int,
+        filtered_daily: int,
+        filtered_intraday: int,
+        final_count: int,
+    ):
+        """
+        Print filtering summary
+
+        Args:
+            total_stocks: Total stocks analyzed
+            filtered_daily: Stocks that passed daily filters
+            filtered_intraday: Stocks that passed intraday filters
+            final_count: Final selected stocks count
+        """
+        print("\n📊 FILTERING SUMMARY")
+        print("-" * 60)
+        print(f"Total NIFTY50 stocks analyzed:    {total_stocks}")
+        print(f"Passed daily filters:             {filtered_daily}")
+        print(f"Passed intraday confirmation:     {filtered_intraday}")
+        print(f"Final selection:                  {final_count}")
+        print("-" * 60)
+
+    @staticmethod
+    def print_stock_details(stocks: List[Dict]):
+        """
+        Print detailed stock information to console
+
+        Args:
+            stocks: List of selected stocks with scores
+        """
+        if not stocks:
+            print("\n⚠️  NO STOCKS SELECTED TODAY")
+            print("All stocks failed to meet the filtering criteria.")
+            print("This is normal behavior - not every day has suitable setups.\n")
+            return
+
+        print(f"\n✅ TOP {len(stocks)} STOCK(S) SELECTED")
+        print("=" * 60)
+
+        for i, stock in enumerate(stocks, 1):
+            print(f"\n#{i} {stock['symbol']} - Score: {stock['final_score']}/100")
+            print("-" * 60)
+            print(f"  Daily Trend:        {'✓' if stock['daily_trend'] else '✗'}")
+            print(f"  Above 200 EMA:      {'✓' if stock['above_200ema'] else '✗'}")
+            print(f"  ADX:                {stock['ADX']:.2f}")
+            print(f"  RSI:                {stock['RSI']:.2f}")
+            print(f"  ATR Ratio:          {stock['ATR_ratio']:.2f}x")
+            print(f"  Relative Strength:  {stock['relative_strength']:+.2f}%")
+            print(f"  Volume Confirmed:   {'✓' if stock['volume_confirmed'] else '✗'}")
+            print(f"  Intraday Bias:      {stock['intraday_bias']}")
+            print(f"  Entry Reason:       {stock['entry_reason']}")
+
+        print("\n" + "=" * 60)
+
+    @staticmethod
+    def save_to_json(stocks: List[Dict]) -> str:
+        """
+        Save results to JSON file with date in filename
+
+        Args:
+            stocks: List of selected stocks
+
+        Returns:
+            Path to saved file
+        """
+        # Create results directory if it doesn't exist
+        os.makedirs(RESULTS_DIR, exist_ok=True)
+
+        # Generate filename with current date
+        date_str = datetime.now().strftime("%Y-%m-%d")
+        filename = f"{date_str}.json"
+        filepath = os.path.join(RESULTS_DIR, filename)
+
+        # Prepare output data
+        output_data = {
+            "date": date_str,
+            "timestamp": datetime.now().isoformat(),
+            "total_selected": len(stocks),
+            "stocks": stocks,
+        }
+
+        # Save to file
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(output_data, f, indent=2, ensure_ascii=False)
+
+        return filepath
+
+    @staticmethod
+    def display_and_save(
+        stocks: List[Dict],
+        total_stocks: int,
+        filtered_daily: int,
+        filtered_intraday: int,
+    ):
+        """
+        Main output function - display to console and save to JSON
+
+        Args:
+            stocks: List of selected stocks
+            total_stocks: Total stocks analyzed
+            filtered_daily: Stocks that passed daily filters
+            filtered_intraday: Stocks that passed intraday filters
+        """
+        # Print header
+        OutputHandler.print_header()
+
+        # Print summary
+        OutputHandler.print_summary(
+            total_stocks, filtered_daily, filtered_intraday, len(stocks)
+        )
+
+        # Print stock details
+        OutputHandler.print_stock_details(stocks)
+
+        # Save to JSON
+        try:
+            filepath = OutputHandler.save_to_json(stocks)
+            print(f"\n💾 Results saved to: {filepath}\n")
+        except Exception as e:
+            print(f"\n⚠️  Failed to save results to JSON: {str(e)}\n")
+
+        # Print trading reminder
+        if stocks:
+            print("📝 TRADING NOTES:")
+            print("- Entry: Wait for pullback to 9 or 20 EMA on 15-min chart")
+            print("- Stop Loss: Below last 15-min swing low or 0.6-0.8× 15-min ATR")
+            print("- Target: 1R to 1.3R")
+            print("- Risk per trade: ≤ 0.5% of capital")
+            print("- Max trades/day: 1-2\n")
