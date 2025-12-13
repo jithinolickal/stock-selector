@@ -108,12 +108,15 @@ class OutputHandler:
         print("\n" + "=" * 60)
 
     @staticmethod
-    def save_to_json(stocks: List[Dict]) -> str:
+    def save_to_json(stocks: List[Dict], trade_setups: Dict = None, market_sentiment: Dict = None, stock_analysis: Dict = None) -> str:
         """
         Save results to JSON file with date in filename
 
         Args:
             stocks: List of selected stocks
+            trade_setups: Optional dict of trade setups by symbol
+            market_sentiment: Optional market sentiment analysis
+            stock_analysis: Optional dict of stock market analysis
 
         Returns:
             Path to saved file
@@ -131,8 +134,19 @@ class OutputHandler:
             "date": date_str,
             "timestamp": datetime.now().isoformat(),
             "total_selected": len(stocks),
+            "market_sentiment": market_sentiment,
             "stocks": stocks,
         }
+
+        # Add trade setups and market analysis for each stock
+        if trade_setups or stock_analysis:
+            for stock in output_data["stocks"]:
+                symbol = stock.get("symbol")
+                if symbol:
+                    if trade_setups and symbol in trade_setups:
+                        stock["trade_setup"] = trade_setups[symbol]
+                    if stock_analysis and symbol in stock_analysis:
+                        stock["market_analysis"] = stock_analysis[symbol]
 
         # Save to file
         with open(filepath, "w", encoding="utf-8") as f:
@@ -182,7 +196,7 @@ class OutputHandler:
 
         # Save to JSON
         try:
-            filepath = OutputHandler.save_to_json(stocks)
+            filepath = OutputHandler.save_to_json(stocks, trade_setups, market_sentiment, stock_analysis)
             print(f"\n💾 Results saved to: {filepath}\n")
         except Exception as e:
             print(f"\n⚠️  Failed to save results to JSON: {str(e)}\n")
