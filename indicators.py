@@ -206,7 +206,7 @@ def add_all_indicators(df: pd.DataFrame) -> pd.DataFrame:
 
 def add_intraday_indicators(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Add intraday-specific indicators (VWAP, volume) to 15-min DataFrame
+    Add intraday-specific indicators (VWAP, volume, EMAs) to 15-min DataFrame
 
     Args:
         df: DataFrame with 15-min OHLCV data
@@ -222,4 +222,26 @@ def add_intraday_indicators(df: pd.DataFrame) -> pd.DataFrame:
     # 20-period volume average for intraday
     df["volume_avg_20"] = df["volume"].rolling(window=20).mean()
 
+    # EMAs for entry levels (9 and 20 period on 15-min)
+    df["ema_9"] = calculate_ema(df, 9)
+    df["ema_20_intraday"] = calculate_ema(df, 20)
+
     return df
+
+
+def find_swing_low(df: pd.DataFrame, lookback: int = 10) -> float:
+    """
+    Find the last swing low from recent candles
+
+    Args:
+        df: DataFrame with OHLCV data
+        lookback: Number of recent candles to check
+
+    Returns:
+        Swing low price
+    """
+    if len(df) < lookback:
+        lookback = len(df)
+
+    recent_lows = df["low"].tail(lookback)
+    return recent_lows.min()

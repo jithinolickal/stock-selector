@@ -44,12 +44,13 @@ class OutputHandler:
         print("-" * 60)
 
     @staticmethod
-    def print_stock_details(stocks: List[Dict]):
+    def print_stock_details(stocks: List[Dict], trade_setups: Dict = None):
         """
         Print detailed stock information to console
 
         Args:
             stocks: List of selected stocks with scores
+            trade_setups: Optional dict of trade setups by symbol
         """
         if not stocks:
             print("\n⚠️  NO STOCKS SELECTED TODAY")
@@ -61,7 +62,8 @@ class OutputHandler:
         print("=" * 60)
 
         for i, stock in enumerate(stocks, 1):
-            print(f"\n#{i} {stock['symbol']} - Score: {stock['final_score']}/100")
+            symbol = stock['symbol']
+            print(f"\n#{i} {symbol} - Score: {stock['final_score']}/100")
             print("-" * 60)
             print(f"  Daily Trend:        {'✓' if stock['daily_trend'] else '✗'}")
             print(f"  Above 200 EMA:      {'✓' if stock['above_200ema'] else '✗'}")
@@ -72,6 +74,12 @@ class OutputHandler:
             print(f"  Volume Confirmed:   {'✓' if stock['volume_confirmed'] else '✗'}")
             print(f"  Intraday Bias:      {stock['intraday_bias']}")
             print(f"  Entry Reason:       {stock['entry_reason']}")
+
+            # Print trade setup if available
+            if trade_setups and symbol in trade_setups:
+                from trade_setup import TradeSetupCalculator
+                setup_str = TradeSetupCalculator.format_trade_setup(trade_setups[symbol], symbol)
+                print(setup_str)
 
         print("\n" + "=" * 60)
 
@@ -114,6 +122,7 @@ class OutputHandler:
         total_stocks: int,
         filtered_daily: int,
         filtered_intraday: int,
+        trade_setups: Dict = None,
     ):
         """
         Main output function - display to console and save to JSON
@@ -123,6 +132,7 @@ class OutputHandler:
             total_stocks: Total stocks analyzed
             filtered_daily: Stocks that passed daily filters
             filtered_intraday: Stocks that passed intraday filters
+            trade_setups: Optional dict of trade setups by symbol
         """
         # Print header
         OutputHandler.print_header()
@@ -133,7 +143,7 @@ class OutputHandler:
         )
 
         # Print stock details
-        OutputHandler.print_stock_details(stocks)
+        OutputHandler.print_stock_details(stocks, trade_setups)
 
         # Save to JSON
         try:

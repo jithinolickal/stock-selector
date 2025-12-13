@@ -120,12 +120,29 @@ def main():
 
         print(f"✓ Top {len(output_stocks)} stock(s) selected")
 
-        # Step 6: Display and save results
+        # Step 6: Calculate trade setups for selected stocks (if not in test mode)
+        trade_setups = {}
+        if not args.test_mode:
+            from trade_setup import TradeSetupCalculator
+            calculator = TradeSetupCalculator()
+
+            for stock in ranked_stocks:
+                symbol = stock["symbol"]
+                if symbol in all_stock_data:
+                    setup = calculator.calculate_setup(
+                        all_stock_data[symbol]["intraday"],
+                        all_stock_data[symbol]["daily"]
+                    )
+                    if setup:
+                        trade_setups[symbol] = setup
+
+        # Step 7: Display and save results
         OutputHandler.display_and_save(
             output_stocks,
             len(all_stock_data),
             daily_passed_count,
             intraday_passed_count,
+            trade_setups if not args.test_mode else None,
         )
 
         print("✅ Stock selection completed successfully!\n")
