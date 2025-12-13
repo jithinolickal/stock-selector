@@ -44,13 +44,14 @@ class OutputHandler:
         print("-" * 60)
 
     @staticmethod
-    def print_stock_details(stocks: List[Dict], trade_setups: Dict = None):
+    def print_stock_details(stocks: List[Dict], trade_setups: Dict = None, stock_analysis: Dict = None):
         """
         Print detailed stock information to console
 
         Args:
             stocks: List of selected stocks with scores
             trade_setups: Optional dict of trade setups by symbol
+            stock_analysis: Optional dict of market analysis by symbol
         """
         if not stocks:
             print("\n⚠️  NO STOCKS SELECTED TODAY")
@@ -74,6 +75,29 @@ class OutputHandler:
             print(f"  Volume Confirmed:   {'✓' if stock['volume_confirmed'] else '✗'}")
             print(f"  Intraday Bias:      {stock['intraday_bias']}")
             print(f"  Entry Reason:       {stock['entry_reason']}")
+
+            # Print market analysis if available
+            if stock_analysis and symbol in stock_analysis:
+                analysis = stock_analysis[symbol]
+                print(f"\n  📈 MARKET CONTEXT:")
+
+                # Gap info
+                if "gap" in analysis and analysis["gap"]:
+                    gap = analysis["gap"]
+                    print(f"    Gap: {gap['gap_pct']:+.2f}% ({gap['gap_type']})")
+
+                # Previous day levels
+                if "prev_day" in analysis and analysis["prev_day"]:
+                    prev = analysis["prev_day"]
+                    print(f"    Prev Day: H:₹{prev['prev_high']:.2f} L:₹{prev['prev_low']:.2f} C:₹{prev['prev_close']:.2f}")
+
+                # Support/Resistance
+                if "sr_levels" in analysis and analysis["sr_levels"]:
+                    sr = analysis["sr_levels"]
+                    if "support" in sr:
+                        print(f"    Support: ₹{sr['support']:.2f} ({sr['support_distance_pct']:.1f}% below)")
+                    if "resistance" in sr:
+                        print(f"    Resistance: ₹{sr['resistance']:.2f} ({sr['resistance_distance_pct']:.1f}% above)")
 
             # Print trade setup if available
             if trade_setups and symbol in trade_setups:
@@ -123,6 +147,8 @@ class OutputHandler:
         filtered_daily: int,
         filtered_intraday: int,
         trade_setups: Dict = None,
+        market_sentiment: Dict = None,
+        stock_analysis: Dict = None,
     ):
         """
         Main output function - display to console and save to JSON
@@ -133,9 +159,18 @@ class OutputHandler:
             filtered_daily: Stocks that passed daily filters
             filtered_intraday: Stocks that passed intraday filters
             trade_setups: Optional dict of trade setups by symbol
+            market_sentiment: Optional market sentiment analysis
+            stock_analysis: Optional dict of stock market analysis
         """
         # Print header
         OutputHandler.print_header()
+
+        # Print market sentiment
+        if market_sentiment:
+            print("📊 MARKET SENTIMENT (NIFTY50):")
+            print(f"  Gap: {market_sentiment['gap_pct']:+.2f}% ({market_sentiment['gap_type']})")
+            print(f"  Today: {market_sentiment['sentiment']}")
+            print(f"  {market_sentiment['recommendation']}\n")
 
         # Print summary
         OutputHandler.print_summary(
@@ -143,7 +178,7 @@ class OutputHandler:
         )
 
         # Print stock details
-        OutputHandler.print_stock_details(stocks, trade_setups)
+        OutputHandler.print_stock_details(stocks, trade_setups, stock_analysis)
 
         # Save to JSON
         try:

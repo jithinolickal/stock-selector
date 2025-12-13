@@ -163,6 +163,46 @@ class UpstoxDataFetcher:
         """
         return self.fetch_historical_daily(NIFTY50_INDEX_KEY, days)
 
+    def fetch_weekly_candles(self, instrument_key: str, weeks: int = 52) -> pd.DataFrame:
+        """
+        Fetch weekly candles for longer-term trend analysis
+
+        Args:
+            instrument_key: Upstox instrument key
+            weeks: Number of weeks of data (default 52 = 1 year)
+
+        Returns:
+            DataFrame with weekly OHLCV data
+        """
+        # Calculate days needed (weeks * 7 + buffer for weekends)
+        days = weeks * 9  # 9 days per week avg to account for weekends/holidays
+
+        to_date = datetime.now().strftime("%Y-%m-%d")
+        from_date = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+
+        url = f"https://api.upstox.com/v3/historical-candle/{instrument_key}/weeks/1/{to_date}/{from_date}"
+        headers = {"Authorization": f"Bearer {self.access_token}"}
+
+        response = requests.get(url, headers=headers, timeout=30)
+        response.raise_for_status()
+
+        data = response.json()
+        candles = data.get("data", {}).get("candles", [])
+
+        if not candles:
+            return pd.DataFrame()
+
+        # Convert to DataFrame
+        df = pd.DataFrame(
+            candles,
+            columns=["timestamp", "open", "high", "low", "close", "volume", "oi"],
+        )
+        df["timestamp"] = pd.to_datetime(df["timestamp"])
+        df.set_index("timestamp", inplace=True)
+        df.sort_index(inplace=True)
+
+        return df
+
     def fetch_all_nifty50_data(self) -> Dict[str, Dict[str, pd.DataFrame]]:
         """
         Fetch both daily and intraday data for all NIFTY50 stocks

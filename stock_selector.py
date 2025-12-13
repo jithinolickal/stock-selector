@@ -7,12 +7,14 @@ Selects 1-3 high-probability swing trade stocks based on technical filters
 import sys
 import argparse
 from typing import List, Dict
+import pandas as pd
 
 from data_fetcher import UpstoxDataFetcher
 from indicators import add_all_indicators, add_intraday_indicators
 from filters import StockFilter
 from scorer import StockScorer
 from output import OutputHandler
+from market_analysis import MarketAnalyzer
 
 
 def main():
@@ -47,6 +49,18 @@ def main():
 
         nifty_index_df = add_all_indicators(nifty_index_df)
         print("✓ NIFTY50 index data loaded")
+
+        # Step 1.5: Analyze market sentiment (NIFTY50)
+        print("\nAnalyzing market sentiment...")
+        nifty_intraday = data_fetcher.fetch_intraday_15min(data_fetcher.get_instrument_key("NIFTY 50") or "NSE_INDEX|Nifty 50") if not args.test_mode else pd.DataFrame()
+        market_sentiment = MarketAnalyzer.analyze_nifty_sentiment(nifty_index_df, nifty_intraday)
+
+        print(f"NIFTY50 Sentiment: {market_sentiment['sentiment']} (Gap: {market_sentiment['gap_pct']:+.2f}%)")
+        print(f"Recommendation: {market_sentiment['recommendation']}")
+
+        # Warn if market is strongly bearish
+        if market_sentiment['day_change_pct'] < -1.0:
+            print("⚠️  WARNING: Market is down >1% - Consider reducing position sizes or sitting out")
 
         # Step 2: Fetch data for all NIFTY50 stocks
         all_stock_data = data_fetcher.fetch_all_nifty50_data()
@@ -120,19 +134,36 @@ def main():
 
         print(f"✓ Top {len(output_stocks)} stock(s) selected")
 
-        # Step 6: Calculate trade setups for selected stocks (if not in test mode)
+        # Step 6: Calculate trade setups and market analysis for selected stocks
         trade_setups = {}
-        if not args.test_mode:
-            from trade_setup import TradeSetupCalculator
-            calculator = TradeSetupCalculator()
+        stock_analysis = {}
 
-            for stock in ranked_stocks:
-                symbol = stock["symbol"]
-                if symbol in all_stock_data:
-                    setup = calculator.calculate_setup(
-                        all_stock_data[symbol]["intraday"],
-                        all_stock_data[symbol]["daily"]
-                    )
+        for stock in ranked_stocks:
+            symbol = stock["symbol"]
+            if symbol in all_stock_data:
+                daily_df = all_stock_data[symbol]["daily"]
+                intraday_df = all_stock_data[symbol]["intraday"]
+
+                # Market analysis (gap, prev day, S/R)
+                analyzer = MarketAnalyzer()
+                gap_info = analyzer.calculate_gap(daily_df, intraday_df)
+                prev_day = analyzer.get_previous_day_data(daily_df)
+
+                current_price = intraday_df["close"].iloc[-1] if not intraday_df.empty else daily_df["close"].iloc[-1]
+                sr_levels = analyzer.find_support_resistance(daily_df, current_price, lookback=30)
+
+                stock_analysis[symbol] = {
+                    "gap": gap_info,
+                    "prev_day": prev_day,
+                    "sr_levels": sr_levels,
+                    "current_price": current_price,
+                }
+
+                # Trade setup calculation (production mode only)
+                if not args.test_mode:
+                    from trade_setup import TradeSetupCalculator
+                    calculator = TradeSetupCalculator()
+                    setup = calculator.calculate_setup(intraday_df, daily_df)
                     if setup:
                         trade_setups[symbol] = setup
 
@@ -143,6 +174,8 @@ def main():
             daily_passed_count,
             intraday_passed_count,
             trade_setups if not args.test_mode else None,
+            market_sentiment,
+            stock_analysis,
         )
 
         print("✅ Stock selection completed successfully!\n")
