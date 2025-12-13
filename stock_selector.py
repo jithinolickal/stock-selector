@@ -5,6 +5,7 @@ Selects 1-3 high-probability swing trade stocks based on technical filters
 """
 
 import sys
+import argparse
 from typing import List, Dict
 
 from data_fetcher import UpstoxDataFetcher
@@ -16,8 +17,23 @@ from output import OutputHandler
 
 def main():
     """Main execution function"""
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser(
+        description="NIFTY50 Stock Selector for swing trading"
+    )
+    parser.add_argument(
+        "--test-mode",
+        action="store_true",
+        help="Run in test mode (skip intraday filters, use daily filters only)",
+    )
+    args = parser.parse_args()
+
     try:
         # Initialize components
+        if args.test_mode:
+            print("⚠️  RUNNING IN TEST MODE - Intraday filters disabled")
+            print("This mode is for testing only. Use live mode during market hours.\n")
+
         print("Initializing stock selector...")
         data_fetcher = UpstoxDataFetcher()
         scorer = StockScorer()
@@ -56,7 +72,11 @@ def main():
         print("✓ Indicators calculated")
 
         # Step 4: Apply filters
-        print("\nApplying daily and intraday filters...")
+        if args.test_mode:
+            print("\nApplying daily filters only (test mode)...")
+        else:
+            print("\nApplying daily and intraday filters...")
+
         stock_filter = StockFilter(nifty_index_df)
 
         filtered_stocks: List[Dict] = []
@@ -64,17 +84,30 @@ def main():
         intraday_passed_count = 0
 
         for symbol, data in all_stock_data.items():
-            passed, results = stock_filter.filter_stock(
-                symbol, data["daily"], data["intraday"]
-            )
+            if args.test_mode:
+                # Test mode: only apply daily filters
+                passed, results = stock_filter.apply_daily_filters(symbol, data["daily"])
+                if passed:
+                    daily_passed_count += 1
+                    intraday_passed_count += 1  # Count as passed since skipped
+                    # Add mock intraday results for output compatibility
+                    results["symbol"] = symbol
+                    results["intraday_bias"] = "test_mode"
+                    results["volume_confirmed"] = True
+                    filtered_stocks.append(results)
+            else:
+                # Production mode: apply both daily and intraday filters
+                passed, results = stock_filter.filter_stock(
+                    symbol, data["daily"], data["intraday"]
+                )
 
-            if results.get("stage") == "daily" and results.get("passed"):
-                daily_passed_count += 1
+                if results.get("stage") == "daily" and results.get("passed"):
+                    daily_passed_count += 1
 
-            if passed:
-                daily_passed_count += 1
-                intraday_passed_count += 1
-                filtered_stocks.append(results)
+                if passed:
+                    daily_passed_count += 1
+                    intraday_passed_count += 1
+                    filtered_stocks.append(results)
 
         print(f"✓ Filters applied: {len(filtered_stocks)} stocks passed all criteria")
 

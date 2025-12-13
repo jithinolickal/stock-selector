@@ -23,7 +23,7 @@ FILTER_THRESHOLDS = {
     "ADX_MIN": 25,                    # Minimum ADX for trend strength
     "RSI_MIN": 40,                    # Minimum RSI
     "RSI_MAX": 65,                    # Maximum RSI
-    "ATR_MULTIPLIER": 1.5,            # ATR must be >= 1.5x its 20-day average
+    "ATR_MULTIPLIER": 1.0,            # ATR must be >= 1.0x its 20-day average (reduced for Indian markets)
     "VOLUME_MULTIPLIER": 1.0,         # Current volume > 1x of 20-day average
     "EMA_SLOPE_DAYS": 5,              # Days to check EMA20 slope
 
@@ -47,7 +47,7 @@ MAX_STOCKS_TO_SELECT = 3      # Return top 1-3 stocks
 RESULTS_DIR = "results"        # Directory for daily JSON outputs
 
 # Data fetching configuration
-HISTORICAL_DAYS = 200          # Number of daily candles to fetch
+HISTORICAL_DAYS = 400          # Number of calendar days to fetch (~250-280 trading days for EMA200)
 INTRADAY_START_TIME = "09:15"  # Market open time
 INTRADAY_END_TIME = "10:00"    # Cutoff for intraday confirmation
 

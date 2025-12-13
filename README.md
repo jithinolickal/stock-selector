@@ -68,6 +68,8 @@ Edit `config.py` to adjust:
 
 ## Usage
 
+### Production Mode (Live Trading)
+
 Run the script on days you want to trade (ideally between 9:30-10:00 AM IST):
 
 ```bash
@@ -79,6 +81,20 @@ Or make it executable:
 chmod +x stock_selector.py
 ./stock_selector.py
 ```
+
+### Test Mode (For Testing Anytime)
+
+Run with `--test-mode` flag to skip intraday filters and test with daily data only:
+
+```bash
+python stock_selector.py --test-mode
+```
+
+**⚠️ Important:**
+- Test mode is ONLY for testing the script outside market hours
+- It skips all intraday 15-min confirmations (VWAP, candle patterns, etc.)
+- Results will be less accurate since intraday filters are critical for entry timing
+- Always use production mode (without flag) during actual trading hours
 
 ## Output
 
@@ -177,8 +193,13 @@ stock-selector/
 ├── requirements.txt     # Python dependencies
 ├── .env.example         # Environment variables template
 ├── .env                 # Your credentials (gitignored)
-└── results/             # Daily JSON outputs
-    └── YYYY-MM-DD.json
+├── results/             # Daily JSON outputs
+│   └── YYYY-MM-DD.json
+└── tests/               # Test & debugging scripts
+    ├── README.md        # Test scripts documentation
+    ├── diagnose_filters.py
+    ├── backtest_month.py
+    └── ... (see tests/README.md)
 ```
 
 ## Filter Details
@@ -190,7 +211,7 @@ stock-selector/
 4. EMA20 slope positive (last 5 days)
 5. ADX(14) > 25
 6. RSI(14) between 40-65
-7. ATR(14) ≥ 1.5× its 20-day average
+7. ATR(14) ≥ 1.0× its 20-day average (adjusted for Indian markets)
 8. Volume > 20-day average
 9. Relative Strength vs NIFTY50 > 0
 
@@ -223,6 +244,8 @@ stock-selector/
 ### "No stocks selected today"
 - This is normal - not every day has suitable setups
 - Check if market conditions are choppy/bearish
+- Run `python tests/diagnose_filters.py` to see which filters are blocking stocks
+- Run `python tests/backtest_month.py` to check historical pass rates
 
 ## License
 
