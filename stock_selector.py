@@ -69,7 +69,25 @@ def main():
             print("❌ No stock data fetched. Exiting.")
             sys.exit(1)
 
-        # Step 3: Calculate indicators for all stocks
+        # Step 3: Fetch weekly data for all stocks (for higher timeframe validation)
+        print("\nFetching weekly candles for trend validation...")
+        for symbol in all_stock_data:
+            instrument_key = data_fetcher.get_instrument_key(symbol)
+            if instrument_key:
+                try:
+                    weekly_df = data_fetcher.fetch_weekly_candles(instrument_key, weeks=52)
+                    if not weekly_df.empty:
+                        all_stock_data[symbol]["weekly"] = add_all_indicators(weekly_df)
+                    else:
+                        all_stock_data[symbol]["weekly"] = pd.DataFrame()
+                except Exception:
+                    all_stock_data[symbol]["weekly"] = pd.DataFrame()
+            else:
+                all_stock_data[symbol]["weekly"] = pd.DataFrame()
+
+        print("✓ Weekly data fetched")
+
+        # Step 4: Calculate indicators for all stocks
         print("\nCalculating technical indicators...")
         for symbol in all_stock_data:
             # Add daily indicators
@@ -85,11 +103,11 @@ def main():
 
         print("✓ Indicators calculated")
 
-        # Step 4: Apply filters
+        # Step 5: Apply filters
         if args.test_mode:
             print("\nApplying daily filters only (test mode)...")
         else:
-            print("\nApplying daily and intraday filters...")
+            print("\nApplying daily, weekly, and intraday filters...")
 
         stock_filter = StockFilter(nifty_index_df)
 
@@ -108,11 +126,13 @@ def main():
                     results["symbol"] = symbol
                     results["intraday_bias"] = "test_mode"
                     results["volume_confirmed"] = True
+                    results["weekly_trend"] = "test_mode"
+                    results["weekly_suitable"] = None
                     filtered_stocks.append(results)
             else:
-                # Production mode: apply both daily and intraday filters
+                # Production mode: apply daily, weekly, and intraday filters
                 passed, results = stock_filter.filter_stock(
-                    symbol, data["daily"], data["intraday"]
+                    symbol, data["daily"], data["intraday"], data.get("weekly")
                 )
 
                 if results.get("stage") == "daily" and results.get("passed"):
@@ -137,6 +157,7 @@ def main():
         # Step 6: Calculate trade setups and market analysis for selected stocks
         trade_setups = {}
         stock_analysis = {}
+        validated_stocks = []
 
         for stock in ranked_stocks:
             symbol = stock["symbol"]
@@ -159,13 +180,35 @@ def main():
                     "current_price": current_price,
                 }
 
-                # Trade setup calculation (production mode only)
+                # Trade setup calculation and quality validation (production mode only)
                 if not args.test_mode:
                     from trade_setup import TradeSetupCalculator
                     calculator = TradeSetupCalculator()
                     setup = calculator.calculate_setup(intraday_df, daily_df)
+
                     if setup:
                         trade_setups[symbol] = setup
+
+                        # Validate trade quality
+                        quality_passed, quality_metrics = StockFilter.validate_trade_quality(
+                            setup, current_price, stock_analysis[symbol]
+                        )
+
+                        if quality_passed:
+                            stock["trade_quality"] = quality_metrics
+                            validated_stocks.append(stock)
+                        else:
+                            print(f"  ⚠️  {symbol} rejected: {quality_metrics.get('reason', 'Failed trade quality')}")
+                else:
+                    # Test mode - skip trade quality validation
+                    validated_stocks.append(stock)
+
+        # Update ranked stocks with only validated ones
+        if not args.test_mode:
+            ranked_stocks = validated_stocks
+            print(f"✓ Trade quality validation: {len(ranked_stocks)} stocks passed")
+            # Re-score after validation
+            output_stocks = [scorer.get_stock_summary(stock) for stock in ranked_stocks]
 
         # Step 7: Display and save results
         OutputHandler.display_and_save(

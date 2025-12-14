@@ -20,12 +20,27 @@ NIFTY50_INDEX_KEY = "NSE_INDEX|Nifty 50"
 # Filter thresholds (from updated plan)
 FILTER_THRESHOLDS = {
     # Daily timeframe filters
-    "ADX_MIN": 25,                    # Minimum ADX for trend strength
-    "RSI_MIN": 40,                    # Minimum RSI
-    "RSI_MAX": 65,                    # Maximum RSI
-    "ATR_MULTIPLIER": 1.0,            # ATR must be >= 1.0x its 20-day average (reduced for Indian markets)
+    "ADX_MIN": 23,                    # Minimum ADX for trend strength (slightly relaxed for real markets)
+    "RSI_MIN": 42,                    # Minimum RSI (balanced - not too tight)
+    "RSI_MAX": 62,                    # Maximum RSI (balanced - not too tight)
+    "ATR_MULTIPLIER": 1.15,           # ATR must be >= 1.15x its 20-day average (slight expansion)
     "VOLUME_MULTIPLIER": 1.0,         # Current volume > 1x of 20-day average
     "EMA_SLOPE_DAYS": 5,              # Days to check EMA20 slope
+
+    # Price action filters
+    "MIN_HIGHER_LOWS": 2,             # Minimum consecutive higher lows required (relaxed to 2)
+    "CONSOLIDATION_RANGE": 0.03,      # Max 3% range for consolidation detection
+    "CONSOLIDATION_DAYS": 5,          # Minimum days in consolidation
+    "VOLUME_EXPANSION_DAYS": 3,       # Check last N days for volume expansion
+
+    # Support/Resistance filters
+    "MIN_DISTANCE_TO_RESISTANCE": 2.0,  # Minimum 2% distance to resistance
+    "MAX_DISTANCE_TO_SUPPORT": 5.0,     # Maximum 5% distance to support
+
+    # Trade quality filters
+    "MIN_STOP_DISTANCE": 0.5,         # Minimum 0.5% stop distance
+    "MAX_STOP_DISTANCE": 2.0,         # Maximum 2.0% stop distance
+    "MIN_RISK_REWARD": 1.5,           # Minimum 1.5R risk-reward ratio
 
     # Intraday confirmation filters (15-min)
     "INTRADAY_VOLUME_MULTIPLIER": 1.2,  # 15-min volume >= 1.2x 20-period avg
@@ -35,11 +50,14 @@ FILTER_THRESHOLDS = {
 
 # Scoring weights (must sum to 100)
 SCORING_WEIGHTS = {
-    "trend_strength": 35,      # ADX + EMA alignment
-    "rsi_position": 25,        # RSI proximity to ideal 50-60
-    "relative_strength": 15,   # Outperformance vs NIFTY50
-    "volume_expansion": 15,    # Volume above average
-    "atr_percentage": 10,      # Volatility measure
+    "trend_strength": 25,           # ADX + EMA alignment
+    "rsi_position": 15,             # RSI proximity to ideal 50-55
+    "relative_strength": 15,        # Outperformance vs NIFTY50
+    "volume_expansion": 10,         # Volume above average
+    "atr_percentage": 5,            # Volatility measure
+    "weekly_alignment": 10,         # Weekly timeframe confirmation
+    "price_action": 10,             # Higher lows pattern
+    "trade_quality": 10,            # Stop quality + R:R ratio
 }
 
 # Output configuration

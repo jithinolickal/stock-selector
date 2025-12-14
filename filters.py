@@ -10,7 +10,12 @@ from indicators import (
     calculate_volume_ratio,
     calculate_atr_ratio,
     calculate_relative_strength,
+    check_higher_lows,
+    detect_consolidation,
+    check_volume_expansion,
+    detect_bullish_engulfing,
 )
+from market_analysis import MarketAnalyzer
 
 
 class StockFilter:
@@ -104,6 +109,28 @@ class StockFilter:
             return False, {"reason": "Not outperforming NIFTY50"}
         results["relative_strength"] = rs
 
+        # Filter 10: Higher lows pattern (minimum 3 consecutive)
+        higher_lows = check_higher_lows(df, lookback=FILTER_THRESHOLDS["MIN_HIGHER_LOWS"] + 1)
+        if higher_lows < FILTER_THRESHOLDS["MIN_HIGHER_LOWS"]:
+            return False, {"reason": f"Less than {FILTER_THRESHOLDS['MIN_HIGHER_LOWS']} consecutive higher lows"}
+        results["higher_lows_count"] = higher_lows
+
+        # Filter 11: Volume expansion pattern (last 3 days) - OPTIONAL BONUS
+        volume_expanding = check_volume_expansion(df, days=FILTER_THRESHOLDS["VOLUME_EXPANSION_DAYS"])
+        results["volume_expanding"] = volume_expanding  # Bonus points in scoring, not required
+
+        # Filter 12: Check if breaking out of consolidation (optional bonus)
+        in_consolidation = detect_consolidation(
+            df.iloc[:-1],  # Check previous days, not today
+            days=FILTER_THRESHOLDS["CONSOLIDATION_DAYS"],
+            max_range_pct=FILTER_THRESHOLDS["CONSOLIDATION_RANGE"]
+        )
+        results["breakout_from_consolidation"] = in_consolidation
+
+        # Filter 13: Bullish price action pattern (optional bonus)
+        bullish_pattern = detect_bullish_engulfing(df)
+        results["bullish_pattern"] = bullish_pattern
+
         # All filters passed
         results["passed"] = True
         return True, results
@@ -186,7 +213,7 @@ class StockFilter:
         return True, results
 
     def filter_stock(
-        self, symbol: str, daily_df: pd.DataFrame, intraday_df: pd.DataFrame
+        self, symbol: str, daily_df: pd.DataFrame, intraday_df: pd.DataFrame, weekly_df: pd.DataFrame = None
     ) -> Tuple[bool, Dict[str, any]]:
         """
         Apply both daily and intraday filters to a stock
@@ -195,6 +222,7 @@ class StockFilter:
             symbol: Stock symbol
             daily_df: DataFrame with daily data and indicators
             intraday_df: DataFrame with 15-min intraday data and indicators
+            weekly_df: Optional weekly DataFrame for higher timeframe validation
 
         Returns:
             Tuple of (passed: bool, combined_results: dict)
@@ -204,6 +232,19 @@ class StockFilter:
 
         if not daily_passed:
             return False, {"stage": "daily", **daily_results}
+
+        # Filter 14: Weekly timeframe alignment (optional but highly recommended)
+        if weekly_df is not None and not weekly_df.empty:
+            weekly_trend = MarketAnalyzer.check_weekly_trend(weekly_df)
+            daily_results["weekly_trend"] = weekly_trend["weekly_trend"]
+            daily_results["weekly_suitable"] = weekly_trend.get("suitable_for_swing", False)
+
+            # Require weekly alignment for high-quality setups
+            if not weekly_trend.get("suitable_for_swing", False):
+                return False, {"stage": "weekly", "reason": "Weekly trend not suitable for swing", **daily_results}
+        else:
+            daily_results["weekly_trend"] = "Unknown"
+            daily_results["weekly_suitable"] = None
 
         # Apply intraday filters
         intraday_passed, intraday_results = self.apply_intraday_filters(intraday_df)
@@ -220,3 +261,69 @@ class StockFilter:
         }
 
         return True, combined
+
+    @staticmethod
+    def validate_trade_quality(
+        trade_setup: Dict,
+        current_price: float,
+        stock_analysis: Dict
+    ) -> Tuple[bool, Dict]:
+        """
+        Validate trade setup quality (stop distance, R:R, proximity to resistance)
+
+        Args:
+            trade_setup: Trade setup dict with stop/target levels
+            current_price: Current stock price
+            stock_analysis: Stock market analysis with S/R levels
+
+        Returns:
+            Tuple of (passed: bool, quality_metrics: dict)
+        """
+        if not trade_setup:
+            return False, {"reason": "No trade setup available"}
+
+        metrics = {}
+
+        # Check stop loss distance
+        stop_loss = trade_setup.get("stop_loss")
+        if stop_loss:
+            stop_distance_pct = abs((current_price - stop_loss) / current_price) * 100
+            metrics["stop_distance_pct"] = stop_distance_pct
+
+            if stop_distance_pct < FILTER_THRESHOLDS["MIN_STOP_DISTANCE"]:
+                return False, {"reason": f"Stop too tight ({stop_distance_pct:.2f}% < {FILTER_THRESHOLDS['MIN_STOP_DISTANCE']}%)"}
+
+            if stop_distance_pct > FILTER_THRESHOLDS["MAX_STOP_DISTANCE"]:
+                return False, {"reason": f"Stop too wide ({stop_distance_pct:.2f}% > {FILTER_THRESHOLDS['MAX_STOP_DISTANCE']}%)"}
+
+        # Check risk-reward ratio (using EMA9 entry)
+        risk_ema9 = trade_setup.get("risk_ema9", 0)
+        target_ema9 = trade_setup.get("target_ema9")
+        ema9 = trade_setup.get("ema9")
+
+        if risk_ema9 > 0 and target_ema9 and ema9:
+            rr_ratio = (target_ema9 - ema9) / risk_ema9
+            metrics["risk_reward"] = rr_ratio
+
+            if rr_ratio < FILTER_THRESHOLDS["MIN_RISK_REWARD"]:
+                return False, {"reason": f"R:R too low ({rr_ratio:.2f}R < {FILTER_THRESHOLDS['MIN_RISK_REWARD']}R)"}
+
+        # Check distance to resistance
+        sr_levels = stock_analysis.get("sr_levels", {})
+        if "resistance_distance_pct" in sr_levels:
+            res_distance = sr_levels["resistance_distance_pct"]
+            metrics["resistance_distance_pct"] = res_distance
+
+            if res_distance < FILTER_THRESHOLDS["MIN_DISTANCE_TO_RESISTANCE"]:
+                return False, {"reason": f"Too close to resistance ({res_distance:.1f}% < {FILTER_THRESHOLDS['MIN_DISTANCE_TO_RESISTANCE']}%)"}
+
+        # Check distance to support (should not be too far)
+        if "support_distance_pct" in sr_levels:
+            sup_distance = sr_levels["support_distance_pct"]
+            metrics["support_distance_pct"] = sup_distance
+
+            if sup_distance > FILTER_THRESHOLDS["MAX_DISTANCE_TO_SUPPORT"]:
+                return False, {"reason": f"Too far from support ({sup_distance:.1f}% > {FILTER_THRESHOLDS['MAX_DISTANCE_TO_SUPPORT']}%)"}
+
+        metrics["passed"] = True
+        return True, metrics

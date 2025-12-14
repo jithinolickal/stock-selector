@@ -175,6 +175,105 @@ def calculate_relative_strength(
     return stock_return - index_return
 
 
+def check_higher_lows(df: pd.DataFrame, lookback: int = 5) -> int:
+    """
+    Count consecutive higher lows in recent price action
+
+    Args:
+        df: DataFrame with OHLCV data
+        lookback: Number of periods to check
+
+    Returns:
+        Count of consecutive higher lows
+    """
+    if len(df) < lookback:
+        return 0
+
+    recent_lows = df["low"].tail(lookback).values
+    higher_lows = 0
+
+    for i in range(1, len(recent_lows)):
+        if recent_lows[i] > recent_lows[i - 1]:
+            higher_lows += 1
+        else:
+            break
+
+    return higher_lows
+
+
+def detect_consolidation(df: pd.DataFrame, days: int = 5, max_range_pct: float = 0.03) -> bool:
+    """
+    Detect if stock is in consolidation (tight range)
+
+    Args:
+        df: DataFrame with OHLCV data
+        days: Number of days to check
+        max_range_pct: Maximum range as percentage (e.g., 0.03 = 3%)
+
+    Returns:
+        True if in consolidation
+    """
+    if len(df) < days:
+        return False
+
+    recent = df.tail(days)
+    high = recent["high"].max()
+    low = recent["low"].min()
+    range_pct = (high - low) / low
+
+    return range_pct <= max_range_pct
+
+
+def check_volume_expansion(df: pd.DataFrame, days: int = 3) -> bool:
+    """
+    Check if volume is expanding over last N days
+
+    Args:
+        df: DataFrame with OHLCV data
+        days: Number of days to check
+
+    Returns:
+        True if volume is expanding
+    """
+    if len(df) < days:
+        return False
+
+    recent_volume = df["volume"].tail(days).values
+
+    # Check if each day has higher volume than previous
+    for i in range(1, len(recent_volume)):
+        if recent_volume[i] <= recent_volume[i - 1]:
+            return False
+
+    return True
+
+
+def detect_bullish_engulfing(df: pd.DataFrame) -> bool:
+    """
+    Detect bullish engulfing pattern in last 2 candles
+
+    Args:
+        df: DataFrame with OHLCV data
+
+    Returns:
+        True if bullish engulfing detected
+    """
+    if len(df) < 2:
+        return False
+
+    prev = df.iloc[-2]
+    curr = df.iloc[-1]
+
+    # Previous candle bearish, current bullish
+    prev_bearish = prev["close"] < prev["open"]
+    curr_bullish = curr["close"] > curr["open"]
+
+    # Current engulfs previous
+    engulfs = curr["open"] <= prev["close"] and curr["close"] >= prev["open"]
+
+    return prev_bearish and curr_bullish and engulfs
+
+
 def add_all_indicators(df: pd.DataFrame) -> pd.DataFrame:
     """
     Add all technical indicators to DataFrame

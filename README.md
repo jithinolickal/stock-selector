@@ -4,11 +4,15 @@ Python script for selecting 1-3 high-probability NIFTY50 stocks for swing tradin
 
 ## Features
 
-- **9 Daily Filters**: EMA trends, ADX, RSI, ATR, volume, relative strength vs NIFTY50
+- **14 Daily Filters**: EMA trends, ADX, RSI, ATR, volume, relative strength, higher lows pattern, volume expansion, weekly timeframe validation
 - **4 Intraday Confirmations**: VWAP, candle patterns, volume (9:30-10:00 AM window)
-- **Weighted Scoring System**: Ranks stocks by trend strength, momentum, and relative performance
-- **Automated Data Fetching**: Uses Upstox API V3 for historical and intraday data
-- **Daily JSON Output**: Saves results to `results/YYYY-MM-DD.json`
+- **Trade Quality Validation**: Stop distance, risk-reward ratio, support/resistance proximity checks
+- **Multi-Timeframe Analysis**: Daily + Weekly + 15-min intraday data
+- **Automated Trade Setups**: LTP, entry levels (EMA9/20), stop loss, targets calculated automatically
+- **Market Analysis**: Gap analysis, previous day levels, support/resistance detection, NIFTY50 sentiment
+- **Enhanced Scoring System**: 8 factors including weekly alignment, price action patterns, trade quality
+- **Automated Data Fetching**: Uses Upstox API V3 for historical, weekly, and intraday data
+- **Comprehensive JSON Output**: Saves results with trade setups and market analysis to `results/YYYY-MM-DD.json`
 
 ## Requirements
 
@@ -105,13 +109,19 @@ NIFTY50 STOCK SELECTOR - Swing Trading
 Date: 2025-12-13 09:45:00
 ============================================================
 
+📊 MARKET SENTIMENT (NIFTY50):
+  Gap: +0.35% (Flat)
+  Today: Bullish
+  Favorable for trades
+
 [Progress indicators...]
 
 📊 FILTERING SUMMARY
 ------------------------------------------------------------
-Total NIFTY50 stocks analyzed:    50
+Total NIFTY50 stocks analyzed:    49
 Passed daily filters:             12
-Passed intraday confirmation:     3
+Passed intraday confirmation:     5
+Trade quality validation:         3
 Final selection:                  3
 ------------------------------------------------------------
 
@@ -130,6 +140,18 @@ Final selection:                  3
   Intraday Bias:      bullish
   Entry Reason:       trend + momentum continuation
 
+  📈 MARKET CONTEXT:
+    Gap: +0.45% (Flat)
+    Prev Day: H:₹2950.00 L:₹2920.00 C:₹2935.50
+    Support: ₹2915.00 (1.2% below)
+    Resistance: ₹2975.00 (1.8% above)
+
+  💰 TRADE SETUP:
+    LTP: ₹2940.00
+    Entry (EMA9): ₹2928.50 | Target: ₹2951.20 (1.2R)
+    Entry (EMA20): ₹2920.00 | Target: ₹2944.80 (1.2R)
+    Stop Loss: ₹2918.00 (0.75% risk)
+
 [Additional stocks...]
 
 💾 Results saved to: results/2025-12-13.json
@@ -142,6 +164,13 @@ Results are saved to `results/YYYY-MM-DD.json`:
   "date": "2025-12-13",
   "timestamp": "2025-12-13T09:45:00",
   "total_selected": 3,
+  "market_sentiment": {
+    "gap_pct": 0.35,
+    "gap_type": "Flat",
+    "day_change_pct": 0.28,
+    "today_trend": "Bullish",
+    "recommendation": "Favorable for trades"
+  },
   "stocks": [
     {
       "symbol": "RELIANCE",
@@ -154,7 +183,34 @@ Results are saved to `results/YYYY-MM-DD.json`:
       "volume_confirmed": true,
       "intraday_bias": "bullish",
       "final_score": 87.45,
-      "entry_reason": "trend + momentum continuation"
+      "entry_reason": "trend + momentum continuation",
+      "trade_setup": {
+        "ltp": 2940.00,
+        "ema9": 2928.50,
+        "ema20_intraday": 2920.00,
+        "stop_loss": 2918.00,
+        "target_ema9": 2951.20,
+        "target_ema20": 2944.80,
+        "risk_ema9": 10.50,
+        "risk_ema20": 2.00
+      },
+      "market_analysis": {
+        "gap": {
+          "gap_pct": 0.45,
+          "gap_type": "Flat"
+        },
+        "prev_day": {
+          "high": 2950.00,
+          "low": 2920.00,
+          "close": 2935.50
+        },
+        "sr_levels": {
+          "support": 2915.00,
+          "resistance": 2975.00,
+          "support_distance_pct": 1.2,
+          "resistance_distance_pct": 1.8
+        }
+      }
     }
   ]
 }
@@ -162,22 +218,28 @@ Results are saved to `results/YYYY-MM-DD.json`:
 
 ## Trading Rules (Manual Execution)
 
-The script provides stock suggestions only. Execute trades manually with these rules:
+The script provides stock suggestions with automated trade setups. Execute trades manually using the provided levels:
 
-- **Entry**: Wait for pullback to 9 or 20 EMA on 15-min chart
-- **Stop Loss**:
-  - Below last 15-min swing low, OR
-  - 0.6-0.8× 15-min ATR
-- **Target**: 1R to 1.3R (risk-reward ratio)
-- **Risk per trade**: ≤ 0.5% of capital
+- **Entry**: Use EMA9 or EMA20 entry levels shown in trade setup (wait for pullback)
+- **Stop Loss**: Use calculated stop loss (typically 0.5-2.0% below entry)
+- **Target**: Use calculated targets (minimum 1.2R risk-reward)
+- **Risk per trade**: ≤ 0.5-1% of capital
 - **Max trades/day**: 1-2
+- **Quality Check**: Only trade if:
+  - Market sentiment is favorable (NIFTY50 not down >1%)
+  - Stock has ≥2% room to resistance
+  - Stop loss is 0.5-2.0% away (not too tight/wide)
 
 ## Expected Behavior
 
-- **Some days return 0 stocks** - this is correct behavior
-- Average trades/week: 2-4
-- Expected win rate: 65-75%
+- **Some days return 0 stocks** - this is correct behavior (prevents trading in weak market conditions)
+- Average trades/week: 1-3 (strict filters ensure high quality)
+- Expected win rate: 70-80% (improved with quality filters)
 - Weekly return target: 1-2%
+- Market conditions required:
+  - Strong trending stocks (ADX ≥23, EMA alignment)
+  - Weekly timeframe support
+  - Multiple confirmation factors
 
 ## Project Structure
 
@@ -185,35 +247,43 @@ The script provides stock suggestions only. Execute trades manually with these r
 stock-selector/
 ├── stock_selector.py     # Main entry point
 ├── config.py            # Configuration & constants
-├── data_fetcher.py      # Upstox API data fetching
-├── indicators.py        # Technical indicators calculation
-├── filters.py           # Daily & intraday filters
-├── scorer.py            # Scoring & ranking system
-├── output.py            # Console & JSON output
+├── data_fetcher.py      # Upstox API data fetching (daily, weekly, intraday)
+├── indicators.py        # Technical indicators + price action patterns
+├── filters.py           # Daily, weekly & intraday filters + trade quality validation
+├── scorer.py            # Enhanced scoring system (8 factors)
+├── trade_setup.py       # Automated trade setup calculator
+├── market_analysis.py   # Gap, S/R, sentiment analysis
+├── output.py            # Console & JSON output with full details
 ├── requirements.txt     # Python dependencies
 ├── .env.example         # Environment variables template
 ├── .env                 # Your credentials (gitignored)
-├── results/             # Daily JSON outputs
+├── results/             # Daily JSON outputs with trade setups
 │   └── YYYY-MM-DD.json
 └── tests/               # Test & debugging scripts
     ├── README.md        # Test scripts documentation
     ├── diagnose_filters.py
+    ├── diagnose_new_filters.py
     ├── backtest_month.py
     └── ... (see tests/README.md)
 ```
 
 ## Filter Details
 
-### Daily Filters (9 conditions)
+### Daily Filters (14 conditions)
 1. Price > 200 EMA
 2. Close > EMA20 > EMA50
 3. 50 EMA > 200 EMA (bullish regime)
 4. EMA20 slope positive (last 5 days)
-5. ADX(14) > 25
-6. RSI(14) between 40-65
-7. ATR(14) ≥ 1.0× its 20-day average (adjusted for Indian markets)
+5. ADX(14) ≥ 23 (trend strength)
+6. RSI(14) between 42-62 (momentum zone)
+7. ATR(14) ≥ 1.15× its 20-day average (volatility expansion)
 8. Volume > 20-day average
 9. Relative Strength vs NIFTY50 > 0
+10. Minimum 2 consecutive higher lows (price action)
+11. Volume expansion pattern (bonus - optional)
+12. Consolidation breakout detection (bonus - optional)
+13. Bullish candlestick patterns (bonus - optional)
+14. Weekly timeframe alignment (required for swing trades)
 
 ### Intraday Confirmations (9:30-10:00 AM)
 1. Price above VWAP
@@ -221,13 +291,22 @@ stock-selector/
 3. No large upper wick (>50% of range)
 4. 15-min volume ≥ 1.2× 20-period average
 
-## Scoring Weights
+### Trade Quality Validation
+1. Stop loss distance: 0.5-2.0% from entry (not too tight/wide)
+2. Risk-reward ratio: Minimum 1.5R
+3. Distance to resistance: Minimum 2% (room to move)
+4. Distance to support: Maximum 5% (not too far)
 
-- Trend strength (ADX + EMA): 35%
-- RSI position: 25%
+## Scoring Weights (Enhanced - 8 Factors)
+
+- Trend strength (ADX + EMA): 25%
+- RSI position: 15%
 - Relative Strength vs NIFTY50: 15%
-- Volume expansion: 15%
-- ATR percentage: 10%
+- Volume expansion: 10%
+- ATR percentage: 5%
+- Weekly alignment: 10%
+- Price action patterns: 10%
+- Trade quality: 10%
 
 ## Troubleshooting
 

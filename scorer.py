@@ -134,6 +134,92 @@ class StockScorer:
         score = self.normalize_to_range(atr_ratio, 1.5, 3.0)
         return score
 
+    def calculate_weekly_score(self, filter_results: Dict) -> float:
+        """
+        Calculate weekly timeframe alignment score (10% weight)
+
+        Args:
+            filter_results: Dictionary with filter results
+
+        Returns:
+            Weekly score (0-100)
+        """
+        weekly_suitable = filter_results.get("weekly_suitable")
+
+        if weekly_suitable is True:
+            return 100
+        elif weekly_suitable is False:
+            return 0
+        else:
+            # Unknown - neutral score
+            return 50
+
+    def calculate_price_action_score(self, filter_results: Dict) -> float:
+        """
+        Calculate price action pattern score (10% weight)
+
+        Args:
+            filter_results: Dictionary with filter results
+
+        Returns:
+            Price action score (0-100)
+        """
+        score = 0
+
+        # Higher lows count (max 5)
+        higher_lows = filter_results.get("higher_lows_count", 0)
+        score += self.normalize_to_range(higher_lows, 3, 5) * 0.4
+
+        # Consolidation breakout bonus
+        if filter_results.get("breakout_from_consolidation", False):
+            score += 30
+
+        # Bullish pattern bonus
+        if filter_results.get("bullish_pattern", False):
+            score += 30
+
+        # Volume expansion confirmation
+        if filter_results.get("volume_expanding", False):
+            score += 40
+
+        return min(100, score)
+
+    def calculate_trade_quality_score(self, filter_results: Dict) -> float:
+        """
+        Calculate trade quality score (10% weight)
+        Based on stop quality and R:R ratio
+
+        Args:
+            filter_results: Dictionary with filter results
+
+        Returns:
+            Trade quality score (0-100)
+        """
+        quality_metrics = filter_results.get("trade_quality", {})
+
+        if not quality_metrics or not quality_metrics.get("passed"):
+            return 50  # Neutral if no trade quality data
+
+        score = 0
+
+        # Stop distance quality (closer to 1% is ideal)
+        stop_distance = quality_metrics.get("stop_distance_pct")
+        if stop_distance:
+            # Ideal is 0.8-1.2%, score decreases as it moves away
+            if 0.8 <= stop_distance <= 1.2:
+                score += 50
+            else:
+                # Score based on distance from ideal
+                ideal_distance = abs(stop_distance - 1.0)
+                score += max(0, 50 - (ideal_distance * 25))
+
+        # Risk-reward ratio (higher is better)
+        rr = quality_metrics.get("risk_reward", 1.5)
+        # Normalize 1.5R to 3.0R range
+        score += self.normalize_to_range(rr, 1.5, 3.0) * 0.5
+
+        return min(100, score)
+
     def calculate_total_score(self, filter_results: Dict) -> float:
         """
         Calculate weighted total score for a stock
@@ -149,6 +235,9 @@ class StockScorer:
         rs_score = self.calculate_relative_strength_score(filter_results)
         volume_score = self.calculate_volume_score(filter_results)
         atr_score = self.calculate_atr_score(filter_results)
+        weekly_score = self.calculate_weekly_score(filter_results)
+        price_action_score = self.calculate_price_action_score(filter_results)
+        trade_quality_score = self.calculate_trade_quality_score(filter_results)
 
         # Apply weights
         total_score = (
@@ -157,6 +246,9 @@ class StockScorer:
             + (rs_score * SCORING_WEIGHTS["relative_strength"] / 100)
             + (volume_score * SCORING_WEIGHTS["volume_expansion"] / 100)
             + (atr_score * SCORING_WEIGHTS["atr_percentage"] / 100)
+            + (weekly_score * SCORING_WEIGHTS["weekly_alignment"] / 100)
+            + (price_action_score * SCORING_WEIGHTS["price_action"] / 100)
+            + (trade_quality_score * SCORING_WEIGHTS["trade_quality"] / 100)
         )
 
         return round(total_score, 2)
