@@ -4,8 +4,8 @@ import pandas as pd
 from typing import Dict, Tuple
 from datetime import time
 
-from config import FILTER_THRESHOLDS, INTRADAY_START_TIME, INTRADAY_END_TIME
-from indicators import (
+from config.swing_config import FILTER_THRESHOLDS, INTRADAY_START_TIME, INTRADAY_END_TIME
+from lib.indicators import (
     calculate_ema_slope,
     calculate_volume_ratio,
     calculate_atr_ratio,
@@ -15,7 +15,7 @@ from indicators import (
     check_volume_expansion,
     detect_bullish_engulfing,
 )
-from market_analysis import MarketAnalyzer
+from lib.market_analysis import MarketAnalyzer
 
 
 class StockFilter:

@@ -10,12 +10,12 @@ import upstox_client
 from dotenv import load_dotenv
 import pandas as pd
 
-from config import (
+from config.base_config import (
     NIFTY50_SYMBOLS,
     NIFTY50_INDEX_KEY,
     UPSTOX_INSTRUMENTS_URL,
-    HISTORICAL_DAYS,
 )
+from config.swing_config import HISTORICAL_DAYS
 
 # Load environment variables
 load_dotenv()

@@ -2,7 +2,7 @@
 
 import pandas as pd
 from typing import Dict, Optional
-from indicators import find_swing_low, calculate_atr
+from lib.indicators import find_swing_low, calculate_atr
 
 
 class TradeSetupCalculator:

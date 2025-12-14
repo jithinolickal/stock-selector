@@ -1,23 +1,19 @@
-"""Configuration file for NIFTY50 stock selector"""
+"""Configuration for swing trading strategy (1-3 day holds)"""
 
-# NIFTY50 constituent symbols (official NSE list - updated Dec 2025)
-NIFTY50_SYMBOLS = [
-    "ADANIENT", "ADANIPORTS", "APOLLOHOSP", "ASIANPAINT", "AXISBANK",
-    "BAJAJ-AUTO", "BAJFINANCE", "BAJAJFINSV", "BEL", "BHARTIARTL",
-    "CIPLA", "COALINDIA", "DRREDDY", "EICHERMOT", "GRASIM",
-    "HCLTECH", "HDFCBANK", "HDFCLIFE", "HINDALCO", "HINDUNILVR",
-    "ICICIBANK", "INDIGO", "INFY", "ITC", "JIOFIN",
-    "JSWSTEEL", "KOTAKBANK", "LT", "M&M", "MARUTI",
-    "MAXHEALTH", "NESTLEIND", "NTPC", "ONGC", "POWERGRID",
-    "RELIANCE", "SBILIFE", "SBIN", "SHRIRAMFIN", "SUNPHARMA",
-    "TATASTEEL", "TATACONSUM", "TCS", "TECHM", "TITAN",
-    "TMPV", "TRENT", "ULTRACEMCO", "WIPRO"
-]
+from config.base_config import *
 
-# NIFTY50 Index instrument key for relative strength calculation
-NIFTY50_INDEX_KEY = "NSE_INDEX|Nifty 50"
+# Strategy metadata
+STRATEGY_NAME = "swing"
+STRATEGY_DESCRIPTION = "1-3 day swing trading based on multi-timeframe analysis"
+TIMEFRAME = "1-3 days"
 
-# Filter thresholds (from updated plan)
+# Data fetching configuration
+HISTORICAL_DAYS = 400          # Number of calendar days to fetch (~250-280 trading days for EMA200)
+INTRADAY_START_TIME = "09:15"  # Market open time
+INTRADAY_END_TIME = "10:00"    # Cutoff for intraday confirmation
+INTRADAY_INTERVAL = "15min"    # 15-min candles for swing
+
+# Filter thresholds
 FILTER_THRESHOLDS = {
     # Daily timeframe filters
     "ADX_MIN": 23,                    # Minimum ADX for trend strength (slightly relaxed for real markets)
@@ -62,12 +58,3 @@ SCORING_WEIGHTS = {
 
 # Output configuration
 MAX_STOCKS_TO_SELECT = 3      # Return top 1-3 stocks
-RESULTS_DIR = "results"        # Directory for daily JSON outputs
-
-# Data fetching configuration
-HISTORICAL_DAYS = 400          # Number of calendar days to fetch (~250-280 trading days for EMA200)
-INTRADAY_START_TIME = "09:15"  # Market open time
-INTRADAY_END_TIME = "10:00"    # Cutoff for intraday confirmation
-
-# Upstox API configuration
-UPSTOX_INSTRUMENTS_URL = "https://assets.upstox.com/market-quote/instruments/exchange/NSE.json.gz"

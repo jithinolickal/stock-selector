@@ -3,7 +3,7 @@
 from typing import List, Dict
 import pandas as pd
 
-from config import SCORING_WEIGHTS, MAX_STOCKS_TO_SELECT
+from config.swing_config import SCORING_WEIGHTS, MAX_STOCKS_TO_SELECT
 
 
 class StockScorer:

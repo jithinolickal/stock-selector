@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 from typing import List, Dict
 
-from config import RESULTS_DIR
+from config.base_config import RESULTS_DIR
 
 
 class OutputHandler:
