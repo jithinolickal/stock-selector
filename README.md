@@ -32,14 +32,15 @@ python stock_selector.py --strategy swing
 - **Run time**: 9:30-10:00 AM IST
 - **Details**: See [docs/SWING_STRATEGY.md](docs/SWING_STRATEGY.md)
 
-### Scalping (Coming Soon - Phase 2)
+### Scalping (Intraday)
 ```bash
 python stock_selector.py --strategy scalping
 ```
 - **Best for**: High liquidity periods, quick profits
 - **Hold time**: 5-15 minutes
-- **Run time**: Anytime during market hours
+- **Run time**: Anytime during market hours (9:15 AM-3:30 PM IST)
 - **Details**: See [docs/SCALPING_STRATEGY.md](docs/SCALPING_STRATEGY.md)
+- **Note**: Requires live market data (only works during trading hours)
 
 ## Output
 

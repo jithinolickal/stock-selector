@@ -344,3 +344,40 @@ def find_swing_low(df: pd.DataFrame, lookback: int = 10) -> float:
 
     recent_lows = df["low"].tail(lookback)
     return recent_lows.min()
+
+def add_scalping_indicators(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Add scalping-specific indicators to 3-min DataFrame
+
+    Args:
+        df: DataFrame with OHLCV data (3-min candles)
+
+    Returns:
+        DataFrame with added scalping indicator columns
+    """
+    df = df.copy()
+
+    # Fast RSI for scalping (3-period)
+    df["rsi_3"] = pandas_ta.rsi(df["close"], length=3)
+
+    # EMAs for entries (9 and 20)
+    df["ema_9"] = calculate_ema(df, 9)
+    df["ema_20"] = calculate_ema(df, 20)
+
+    # VWAP
+    df["vwap"] = calculate_vwap(df)
+
+    # MACD for momentum
+    macd = pandas_ta.macd(df["close"], fast=12, slow=26, signal=9)
+    if macd is not None and not macd.empty:
+        df["macd"] = macd["MACD_12_26_9"]
+        df["macd_signal"] = macd["MACDs_12_26_9"]
+        df["macd_hist"] = macd["MACDh_12_26_9"]
+
+    # ATR for volatility
+    df["atr"] = calculate_atr(df, period=14)
+
+    # 20-period volume average
+    df["volume_avg_20"] = df["volume"].rolling(window=20).mean()
+
+    return df

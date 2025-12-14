@@ -249,3 +249,50 @@ class UpstoxDataFetcher:
             print(f"Failed symbols: {', '.join(failed_symbols)}")
 
         return all_data
+
+    def fetch_intraday_data(self, instrument_key: str, interval: str = "3min") -> pd.DataFrame:
+        """
+        Fetch intraday candles for any interval
+
+        Args:
+            instrument_key: Upstox instrument key
+            interval: Candle interval (1min, 3min, 5min, 15min, 30min, 60min)
+
+        Returns:
+            DataFrame with intraday OHLCV data
+        """
+        # Map interval to Upstox API format
+        interval_map = {
+            "1min": "minutes/1",
+            "3min": "minutes/3",
+            "5min": "minutes/5",
+            "15min": "minutes/15",
+            "30min": "minutes/30",
+            "60min": "minutes/60",
+        }
+
+        if interval not in interval_map:
+            raise ValueError(f"Invalid interval: {interval}. Must be one of {list(interval_map.keys())}")
+
+        url = f"https://api.upstox.com/v3/historical-candle/intraday/{instrument_key}/{interval_map[interval]}"
+        headers = {"Authorization": f"Bearer {self.access_token}"}
+
+        response = requests.get(url, headers=headers, timeout=30)
+        response.raise_for_status()
+
+        data = response.json()
+        candles = data.get("data", {}).get("candles", [])
+
+        if not candles:
+            return pd.DataFrame()
+
+        # Convert to DataFrame
+        df = pd.DataFrame(
+            candles,
+            columns=["timestamp", "open", "high", "low", "close", "volume", "oi"],
+        )
+        df["timestamp"] = pd.to_datetime(df["timestamp"])
+        df.set_index("timestamp", inplace=True)
+        df.sort_index(inplace=True)
+
+        return df
