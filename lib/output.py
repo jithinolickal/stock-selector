@@ -115,9 +115,21 @@ class OutputHandler:
 
             # Print trade setup if available
             if trade_setups and symbol in trade_setups:
-                from lib.trade_setup import TradeSetupCalculator
-                setup_str = TradeSetupCalculator.format_trade_setup(trade_setups[symbol], symbol)
-                print(setup_str)
+                setup = trade_setups[symbol]
+
+                # Check if scalping or swing setup
+                if 'entry' in setup and 'ema9' not in setup:
+                    # Scalping setup (simple format)
+                    print(f"\n  💰 TRADE SETUP:")
+                    print(f"    Entry:      ₹{setup['entry']:.2f} (immediate)")
+                    print(f"    Stop Loss:  ₹{setup['stop_loss']:.2f} ({setup['risk']:.2f} risk)")
+                    print(f"    Target:     ₹{setup['target']:.2f} ({setup['reward']:.2f} reward)")
+                    print(f"    R:R Ratio:  1:{setup['reward']/setup['risk']:.2f}")
+                else:
+                    # Swing setup (complex format with EMAs)
+                    from lib.trade_setup import TradeSetupCalculator
+                    setup_str = TradeSetupCalculator.format_trade_setup(setup, symbol)
+                    print(setup_str)
 
         print("\n" + "=" * 60)
 
