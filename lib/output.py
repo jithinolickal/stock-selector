@@ -115,7 +115,7 @@ class OutputHandler:
 
             # Print trade setup if available
             if trade_setups and symbol in trade_setups:
-                from trade_setup import TradeSetupCalculator
+                from lib.trade_setup import TradeSetupCalculator
                 setup_str = TradeSetupCalculator.format_trade_setup(trade_setups[symbol], symbol)
                 print(setup_str)
 
