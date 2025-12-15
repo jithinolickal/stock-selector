@@ -67,28 +67,16 @@ class OutputHandler:
             print(f"\n#{i} {symbol} - Score: {stock['final_score']}/100")
             print("-" * 60)
 
-            # Check if ORB scalping or swing strategy
-            if 'orb_breakout' in stock:
-                # Scalping output
-                print(f"  ORB Breakout:       {stock['orb_breakout'].upper()}")
-                print(f"  ORB Range:          {stock['orb_low']} - {stock['orb_high']}")
-                print(f"  Current Price:      {stock['current_price']}")
-                print(f"  EMA 5/9:            {stock['ema_5']} / {stock['ema_9']}")
-                print(f"  VWAP:               {stock['vwap']} (dev: {stock['vwap_deviation']}%)")
-                print(f"  Volume Spike:       {stock['volume_spike']}x")
-                print(f"  ATR:                {stock['atr']}")
-                print(f"  RSI-7:              {stock['rsi_7']}")
-            else:
-                # Swing output
-                print(f"  Daily Trend:        {'✓' if stock.get('daily_trend') else '✗'}")
-                print(f"  Above 200 EMA:      {'✓' if stock.get('above_200ema') else '✗'}")
-                print(f"  ADX:                {stock.get('ADX', 0):.2f}")
-                print(f"  RSI:                {stock.get('RSI', 0):.2f}")
-                print(f"  ATR Ratio:          {stock.get('ATR_ratio', 0):.2f}x")
-                print(f"  Relative Strength:  {stock.get('relative_strength', 0):+.2f}%")
-                print(f"  Volume Confirmed:   {'✓' if stock.get('volume_confirmed') else '✗'}")
-                print(f"  Intraday Bias:      {stock.get('intraday_bias', '')}")
-                print(f"  Entry Reason:       {stock.get('entry_reason', '')}")
+            # Swing output
+            print(f"  Daily Trend:        {'✓' if stock.get('daily_trend') else '✗'}")
+            print(f"  Above 200 EMA:      {'✓' if stock.get('above_200ema') else '✗'}")
+            print(f"  ADX:                {stock.get('ADX', 0):.2f}")
+            print(f"  RSI:                {stock.get('RSI', 0):.2f}")
+            print(f"  ATR Ratio:          {stock.get('ATR_ratio', 0):.2f}x")
+            print(f"  Relative Strength:  {stock.get('relative_strength', 0):+.2f}%")
+            print(f"  Volume Confirmed:   {'✓' if stock.get('volume_confirmed') else '✗'}")
+            print(f"  Intraday Bias:      {stock.get('intraday_bias', '')}")
+            print(f"  Entry Reason:       {stock.get('entry_reason', '')}")
 
             # Print market analysis if available
             if stock_analysis and symbol in stock_analysis:
@@ -115,21 +103,9 @@ class OutputHandler:
 
             # Print trade setup if available
             if trade_setups and symbol in trade_setups:
-                setup = trade_setups[symbol]
-
-                # Check if scalping or swing setup
-                if 'entry' in setup and 'ema9' not in setup:
-                    # Scalping setup (simple format)
-                    print(f"\n  💰 TRADE SETUP:")
-                    print(f"    Entry:      ₹{setup['entry']:.2f} (immediate)")
-                    print(f"    Stop Loss:  ₹{setup['stop_loss']:.2f} ({setup['risk']:.2f} risk)")
-                    print(f"    Target:     ₹{setup['target']:.2f} ({setup['reward']:.2f} reward)")
-                    print(f"    R:R Ratio:  1:{setup['reward']/setup['risk']:.2f}")
-                else:
-                    # Swing setup (complex format with EMAs)
-                    from lib.trade_setup import TradeSetupCalculator
-                    setup_str = TradeSetupCalculator.format_trade_setup(setup, symbol)
-                    print(setup_str)
+                from lib.trade_setup import TradeSetupCalculator
+                setup_str = TradeSetupCalculator.format_trade_setup(trade_setups[symbol], symbol)
+                print(setup_str)
 
         print("\n" + "=" * 60)
 

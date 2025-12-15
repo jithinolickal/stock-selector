@@ -12,6 +12,7 @@ from strategies import StrategyFactory
 from lib.data_fetcher import UpstoxDataFetcher
 from lib.indicators import add_all_indicators
 from lib.output import OutputHandler
+from lib.output_scalping import ScalpingOutputHandler
 from lib.market_analysis import MarketAnalyzer
 
 
@@ -89,15 +90,23 @@ def main():
         )
 
         # Step 4: Display and save results
-        OutputHandler.display_and_save(
-            selected_stocks,
-            stats["total_stocks"],
-            stats["daily_passed"],
-            stats["intraday_passed"],
-            trade_setups if not args.test_mode else None,
-            market_sentiment,
-            stock_analysis,
-        )
+        if strategy.get_strategy_name() == "scalping":
+            ScalpingOutputHandler.display_and_save(
+                selected_stocks,
+                trade_setups if not args.test_mode else None,
+                market_sentiment,
+                stats,
+            )
+        else:
+            OutputHandler.display_and_save(
+                selected_stocks,
+                stats["total_stocks"],
+                stats["daily_passed"],
+                stats["intraday_passed"],
+                trade_setups if not args.test_mode else None,
+                market_sentiment,
+                stock_analysis,
+            )
 
     except KeyboardInterrupt:
         print("\n\n⚠️  Process interrupted by user. Exiting...")
