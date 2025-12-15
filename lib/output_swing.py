@@ -128,7 +128,7 @@ class OutputHandler:
 
         # Generate filename with current date
         date_str = datetime.now().strftime("%Y-%m-%d")
-        filename = f"{date_str}.json"
+        filename = f"{date_str}_swing.json"
         filepath = os.path.join(RESULTS_DIR, filename)
 
         # Prepare output data
