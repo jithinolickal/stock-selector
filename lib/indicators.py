@@ -358,7 +358,7 @@ def add_scalping_indicators(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
 
     # Fast RSI for scalping (3-period)
-    df["rsi_3"] = pandas_ta.rsi(df["close"], length=3)
+    df["rsi_3"] = ta.rsi(df["close"], length=3)
 
     # EMAs for entries (9 and 20)
     df["ema_9"] = calculate_ema(df, 9)
@@ -368,7 +368,7 @@ def add_scalping_indicators(df: pd.DataFrame) -> pd.DataFrame:
     df["vwap"] = calculate_vwap(df)
 
     # MACD for momentum
-    macd = pandas_ta.macd(df["close"], fast=12, slow=26, signal=9)
+    macd = ta.macd(df["close"], fast=12, slow=26, signal=9)
     if macd is not None and not macd.empty:
         df["macd"] = macd["MACD_12_26_9"]
         df["macd_signal"] = macd["MACDs_12_26_9"]
