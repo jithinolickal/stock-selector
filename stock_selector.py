@@ -11,7 +11,7 @@ import pandas as pd
 from strategies import StrategyFactory
 from lib.data_fetcher import UpstoxDataFetcher
 from lib.indicators import add_all_indicators
-from lib.output import OutputHandler
+from lib.output_swing import OutputHandler
 from lib.output_scalping import ScalpingOutputHandler
 from lib.market_analysis import MarketAnalyzer
 
