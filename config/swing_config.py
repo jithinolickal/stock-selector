@@ -16,10 +16,10 @@ INTRADAY_INTERVAL = "15min"    # 15-min candles for swing
 # Filter thresholds
 FILTER_THRESHOLDS = {
     # Daily timeframe filters
-    "ADX_MIN": 23,                    # Minimum ADX for trend strength (slightly relaxed for real markets)
-    "RSI_MIN": 42,                    # Minimum RSI (balanced - not too tight)
-    "RSI_MAX": 62,                    # Maximum RSI (balanced - not too tight)
-    "ATR_MULTIPLIER": 1.15,           # ATR must be >= 1.15x its 20-day average (slight expansion)
+    "ADX_MIN": 20,                    # Minimum ADX for trend strength (allows moderate trends)
+    "RSI_MIN": 35,                    # Minimum RSI (allows pullback entries)
+    "RSI_MAX": 70,                    # Maximum RSI (allows momentum plays)
+    "ATR_MULTIPLIER": 1.0,            # ATR must be >= 1.0x its 20-day average (at/above average)
     "VOLUME_MULTIPLIER": 1.0,         # Current volume > 1x of 20-day average
     "EMA_SLOPE_DAYS": 5,              # Days to check EMA20 slope
 
