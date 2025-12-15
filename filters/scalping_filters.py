@@ -1,205 +1,236 @@
-"""Scalping-specific filters for intraday trading"""
+"""Scalping filters based on Opening Range Breakout (ORB) strategy"""
 
 import pandas as pd
-import numpy as np
-from typing import Dict, Tuple
-
+from typing import Tuple, Dict
+from datetime import time
 from config.scalping_config import FILTER_THRESHOLDS
 
 
 class ScalpingFilter:
-    """Handles all filtering logic for scalping strategy"""
+    """ORB-based scalping filters for 5-min candles"""
 
-    def __init__(self):
-        """Initialize scalping filter"""
-        pass
-
-    def apply_liquidity_filters(self, symbol: str, daily_df: pd.DataFrame, intraday_df: pd.DataFrame) -> Tuple[bool, Dict]:
+    def calculate_orb(self, intraday_df: pd.DataFrame) -> Tuple[float, float]:
         """
-        Check liquidity requirements (most critical for scalping)
+        Calculate Opening Range (first 15 mins: 9:15-9:30)
+
+        Args:
+            intraday_df: 5-min intraday DataFrame
+
+        Returns:
+            Tuple of (orb_high, orb_low)
+        """
+        # Filter candles between 9:15 and 9:30
+        orb_start = time(9, 15)
+        orb_end = time(9, 30)
+
+        orb_candles = intraday_df[
+            (intraday_df.index.time >= orb_start) &
+            (intraday_df.index.time < orb_end)
+        ]
+
+        if orb_candles.empty:
+            return None, None
+
+        orb_high = orb_candles["high"].max()
+        orb_low = orb_candles["low"].min()
+
+        return orb_high, orb_low
+
+    def apply_liquidity_filters(
+        self, symbol: str, daily_df: pd.DataFrame, intraday_df: pd.DataFrame
+    ) -> Tuple[bool, Dict]:
+        """
+        Check liquidity (volume + spreads)
 
         Args:
             symbol: Stock symbol
-            daily_df: Daily DataFrame for volume check
-            intraday_df: Intraday DataFrame for spread check
+            daily_df: Daily DataFrame
+            intraday_df: 5-min intraday DataFrame
 
         Returns:
             Tuple of (passed: bool, results: dict)
         """
-        results = {}
+        results = {"symbol": symbol}
 
-        # Check average daily volume
-        if len(daily_df) < 20:
-            return False, {"reason": "Insufficient daily data"}
-
+        # Daily average volume check
         avg_volume = daily_df["volume"].tail(20).mean()
         if avg_volume < FILTER_THRESHOLDS["MIN_AVG_VOLUME"]:
-            return False, {"reason": f"Low volume ({avg_volume/1e6:.1f}M < {FILTER_THRESHOLDS['MIN_AVG_VOLUME']/1e6:.1f}M)"}
+            return False, {"reason": f"Low volume ({avg_volume/1e6:.1f}M)"}
 
         results["avg_volume"] = avg_volume
 
-        # Check bid-ask spread (estimate from intraday high-low)
-        if not intraday_df.empty:
-            latest = intraday_df.iloc[-1]
-            spread_pct = ((latest["high"] - latest["low"]) / latest["close"]) * 100
+        # Spread check (using latest 5-min candle)
+        latest = intraday_df.iloc[-1]
+        spread_pct = ((latest["high"] - latest["low"]) / latest["close"]) * 100
 
-            if spread_pct > FILTER_THRESHOLDS["MAX_SPREAD_PERCENT"]:
-                return False, {"reason": f"Wide spread ({spread_pct:.2f}% > {FILTER_THRESHOLDS['MAX_SPREAD_PERCENT']}%)"}
+        if spread_pct > FILTER_THRESHOLDS["MAX_SPREAD_PERCENT"]:
+            return False, {"reason": f"Wide spread ({spread_pct:.2f}%)"}
 
-            results["spread_pct"] = spread_pct
-
+        results["spread_pct"] = spread_pct
         results["passed"] = True
+
         return True, results
 
-    def apply_technical_filters(self, intraday_df: pd.DataFrame) -> Tuple[bool, Dict]:
+    def apply_orb_filters(
+        self, intraday_df: pd.DataFrame
+    ) -> Tuple[bool, Dict]:
         """
-        Apply technical filters on 3-min data
+        Check for Opening Range Breakout
 
         Args:
-            intraday_df: 3-min intraday DataFrame with indicators
+            intraday_df: 5-min intraday DataFrame
 
         Returns:
             Tuple of (passed: bool, results: dict)
         """
-        if intraday_df.empty or len(intraday_df) < 30:
-            return False, {"reason": "Insufficient intraday data"}
+        if intraday_df.empty or len(intraday_df) < 3:
+            return False, {"reason": "Insufficient data for ORB"}
 
+        results = {}
+
+        # Calculate ORB range
+        orb_high, orb_low = self.calculate_orb(intraday_df)
+
+        if orb_high is None or orb_low is None:
+            return False, {"reason": "ORB range not available"}
+
+        results["orb_high"] = orb_high
+        results["orb_low"] = orb_low
+
+        # Current price
+        latest = intraday_df.iloc[-1]
+        current_price = latest["close"]
+        results["current_price"] = current_price
+
+        # Check for breakout (must be at least 0.2% beyond ORB)
+        breakout_threshold = FILTER_THRESHOLDS["ORB_BREAKOUT_MIN_PCT"] / 100
+
+        breakout_up = current_price > orb_high * (1 + breakout_threshold)
+        breakout_down = current_price < orb_low * (1 - breakout_threshold)
+
+        if breakout_up:
+            results["orb_breakout"] = "up"
+        elif breakout_down:
+            results["orb_breakout"] = "down"
+        else:
+            return False, {"reason": f"No ORB breakout (price: {current_price:.2f}, ORB: {orb_low:.2f}-{orb_high:.2f})"}
+
+        results["passed"] = True
+        return True, results
+
+    def apply_ema_filters(
+        self, intraday_df: pd.DataFrame, orb_direction: str
+    ) -> Tuple[bool, Dict]:
+        """
+        Check EMA alignment with ORB breakout direction
+
+        Args:
+            intraday_df: 5-min intraday DataFrame
+            orb_direction: "up" or "down"
+
+        Returns:
+            Tuple of (passed: bool, results: dict)
+        """
         results = {}
         latest = intraday_df.iloc[-1]
 
-        # RSI-3 check (for reversal entries)
-        rsi = latest.get("rsi_3")
-        if pd.isna(rsi):
-            return False, {"reason": "RSI not available"}
-
-        # Look for oversold (buy signal) or overbought (sell signal)
-        if rsi < FILTER_THRESHOLDS["RSI_OVERSOLD"]:
-            results["rsi_signal"] = "oversold_buy"
-            results["rsi_3"] = rsi
-        elif rsi > FILTER_THRESHOLDS["RSI_OVERBOUGHT"]:
-            results["rsi_signal"] = "overbought_sell"
-            results["rsi_3"] = rsi
-        else:
-            return False, {"reason": f"RSI neutral ({rsi:.1f})"}
-
-        # EMA alignment check
+        ema_5 = latest.get("ema_5")
         ema_9 = latest.get("ema_9")
-        ema_20 = latest.get("ema_20")
 
-        if pd.isna(ema_9) or pd.isna(ema_20):
-            return False, {"reason": "EMAs not available"}
+        if pd.isna(ema_5) or pd.isna(ema_9):
+            return False, {"reason": "EMA not available"}
 
+        results["ema_5"] = ema_5
         results["ema_9"] = ema_9
-        results["ema_20"] = ema_20
 
-        # Trend direction
-        if ema_9 > ema_20:
-            results["trend"] = "bullish"
-        else:
-            results["trend"] = "bearish"
+        # Bullish breakout: EMA5 should be > EMA9
+        if orb_direction == "up" and ema_5 <= ema_9:
+            return False, {"reason": f"EMA not aligned for bullish (5:{ema_5:.2f} <= 9:{ema_9:.2f})"}
 
-        # Volume spike check
-        volume_avg = intraday_df["volume"].tail(20).mean()
+        # Bearish breakout: EMA5 should be < EMA9
+        if orb_direction == "down" and ema_5 >= ema_9:
+            return False, {"reason": f"EMA not aligned for bearish (5:{ema_5:.2f} >= 9:{ema_9:.2f})"}
+
+        results["ema_aligned"] = True
+        results["passed"] = True
+        return True, results
+
+    def apply_volume_filters(
+        self, intraday_df: pd.DataFrame
+    ) -> Tuple[bool, Dict]:
+        """
+        Check volume spike (using 10-candle average)
+
+        Args:
+            intraday_df: 5-min intraday DataFrame
+
+        Returns:
+            Tuple of (passed: bool, results: dict)
+        """
+        results = {}
+        latest = intraday_df.iloc[-1]
+
+        # Volume average from indicator (10-period)
+        volume_avg = latest.get("volume_avg_10")
         current_volume = latest["volume"]
 
-        if current_volume < FILTER_THRESHOLDS["MIN_VOLUME_SPIKE"] * volume_avg:
-            return False, {"reason": f"No volume spike ({current_volume/volume_avg:.1f}x < {FILTER_THRESHOLDS['MIN_VOLUME_SPIKE']}x)"}
+        if pd.isna(volume_avg) or volume_avg == 0:
+            return False, {"reason": "Volume average not available"}
 
-        results["volume_spike"] = current_volume / volume_avg
+        volume_ratio = current_volume / volume_avg
 
-        # ATR check (minimum movement potential)
-        atr = latest.get("atr")
-        if pd.isna(atr) or atr < FILTER_THRESHOLDS["MIN_ATR_POINTS"]:
-            return False, {"reason": f"Low ATR ({atr:.1f} < {FILTER_THRESHOLDS['MIN_ATR_POINTS']})"}
+        if volume_ratio < FILTER_THRESHOLDS["MIN_VOLUME_SPIKE"]:
+            return False, {"reason": f"No volume spike ({volume_ratio:.1f}x < {FILTER_THRESHOLDS['MIN_VOLUME_SPIKE']}x)"}
 
-        results["atr"] = atr
-
+        results["volume_spike"] = volume_ratio
         results["passed"] = True
         return True, results
 
-    def apply_vwap_filters(self, intraday_df: pd.DataFrame) -> Tuple[bool, Dict]:
+    def apply_vwap_atr_filters(
+        self, intraday_df: pd.DataFrame
+    ) -> Tuple[bool, Dict]:
         """
-        Check VWAP proximity for mean reversion setups
+        Check VWAP proximity and ATR
 
         Args:
-            intraday_df: 3-min intraday DataFrame
+            intraday_df: 5-min intraday DataFrame
 
         Returns:
             Tuple of (passed: bool, results: dict)
         """
-        if intraday_df.empty:
-            return False, {"reason": "No intraday data"}
-
         results = {}
         latest = intraday_df.iloc[-1]
 
+        # VWAP deviation
         vwap = latest.get("vwap")
         close = latest["close"]
 
         if pd.isna(vwap):
             return False, {"reason": "VWAP not available"}
 
-        # Calculate deviation from VWAP
         vwap_deviation_pct = abs((close - vwap) / vwap) * 100
 
         if vwap_deviation_pct > FILTER_THRESHOLDS["VWAP_DEVIATION_MAX"]:
-            return False, {"reason": f"Too far from VWAP ({vwap_deviation_pct:.2f}% > {FILTER_THRESHOLDS['VWAP_DEVIATION_MAX']}%)"}
+            return False, {"reason": f"Too far from VWAP ({vwap_deviation_pct:.2f}%)"}
 
         results["vwap"] = vwap
         results["vwap_deviation_pct"] = vwap_deviation_pct
 
-        # Determine setup type
-        if close > vwap:
-            results["vwap_position"] = "above"  # Look for pullbacks to VWAP
-        else:
-            results["vwap_position"] = "below"  # Look for bounces from VWAP
+        # ATR check
+        atr = latest.get("atr")
 
-        results["passed"] = True
-        return True, results
+        if pd.isna(atr):
+            return False, {"reason": "ATR not available"}
 
-    def apply_momentum_filters(self, intraday_df: pd.DataFrame) -> Tuple[bool, Dict]:
-        """
-        Check MACD momentum
+        if atr < FILTER_THRESHOLDS["MIN_ATR_POINTS"]:
+            return False, {"reason": f"Low ATR ({atr:.2f} < {FILTER_THRESHOLDS['MIN_ATR_POINTS']})"}
 
-        Args:
-            intraday_df: 3-min intraday DataFrame
+        results["atr"] = atr
 
-        Returns:
-            Tuple of (passed: bool, results: dict)
-        """
-        if intraday_df.empty or len(intraday_df) < 30:
-            return False, {"reason": "Insufficient data for MACD"}
-
-        results = {}
-        latest = intraday_df.iloc[-1]
-        prev = intraday_df.iloc[-2]
-
-        macd = latest.get("macd")
-        macd_signal = latest.get("macd_signal")
-        macd_hist = latest.get("macd_hist")
-
-        if pd.isna(macd) or pd.isna(macd_signal):
-            return False, {"reason": "MACD not available"}
-
-        # Check for MACD crossover (momentum shift)
-        prev_macd = prev.get("macd")
-        prev_signal = prev.get("macd_signal")
-
-        if pd.isna(prev_macd) or pd.isna(prev_signal):
-            results["macd_cross"] = False
-        else:
-            # Bullish cross
-            if prev_macd <= prev_signal and macd > macd_signal:
-                results["macd_cross"] = "bullish"
-            # Bearish cross
-            elif prev_macd >= prev_signal and macd < macd_signal:
-                results["macd_cross"] = "bearish"
-            else:
-                results["macd_cross"] = False
-
-        results["macd"] = macd
-        results["macd_signal"] = macd_signal
-        results["macd_hist"] = macd_hist
+        # RSI (optional - just store, don't filter)
+        rsi = latest.get("rsi_7")
+        if not pd.isna(rsi):
+            results["rsi_7"] = rsi
 
         results["passed"] = True
         return True, results
@@ -208,44 +239,58 @@ class ScalpingFilter:
         self, symbol: str, daily_df: pd.DataFrame, intraday_df: pd.DataFrame
     ) -> Tuple[bool, Dict]:
         """
-        Apply all scalping filters to a stock
+        Apply all ORB scalping filters
 
         Args:
             symbol: Stock symbol
             daily_df: Daily DataFrame
-            intraday_df: 3-min intraday DataFrame with indicators
+            intraday_df: 5-min intraday DataFrame
 
         Returns:
-            Tuple of (passed: bool, combined_results: dict)
+            Tuple of (passed: bool, results: dict)
         """
-        # Filter 1: Liquidity (critical - check first)
-        liquidity_passed, liquidity_results = self.apply_liquidity_filters(symbol, daily_df, intraday_df)
+        # Minimum candles check
+        if intraday_df.empty or len(intraday_df) < 5:
+            return False, {"stage": "data", "reason": "Insufficient intraday data"}
+
+        # Filter 1: Liquidity
+        liquidity_passed, liquidity_results = self.apply_liquidity_filters(
+            symbol, daily_df, intraday_df
+        )
         if not liquidity_passed:
             return False, {"stage": "liquidity", **liquidity_results}
 
-        # Filter 2: Technical indicators
-        technical_passed, technical_results = self.apply_technical_filters(intraday_df)
-        if not technical_passed:
-            return False, {"stage": "technical", **liquidity_results, **technical_results}
+        # Filter 2: ORB Breakout (PRIMARY)
+        orb_passed, orb_results = self.apply_orb_filters(intraday_df)
+        if not orb_passed:
+            return False, {"stage": "orb", **liquidity_results, **orb_results}
 
-        # Filter 3: VWAP proximity
-        vwap_passed, vwap_results = self.apply_vwap_filters(intraday_df)
-        if not vwap_passed:
-            return False, {"stage": "vwap", **liquidity_results, **technical_results, **vwap_results}
+        orb_direction = orb_results["orb_breakout"]
 
-        # Filter 4: Momentum (MACD)
-        momentum_passed, momentum_results = self.apply_momentum_filters(intraday_df)
-        if not momentum_passed:
-            return False, {"stage": "momentum", **liquidity_results, **technical_results, **vwap_results, **momentum_results}
+        # Filter 3: EMA Alignment
+        ema_passed, ema_results = self.apply_ema_filters(intraday_df, orb_direction)
+        if not ema_passed:
+            return False, {"stage": "ema", **liquidity_results, **orb_results, **ema_results}
+
+        # Filter 4: Volume Spike
+        volume_passed, volume_results = self.apply_volume_filters(intraday_df)
+        if not volume_passed:
+            return False, {"stage": "volume", **liquidity_results, **orb_results, **ema_results, **volume_results}
+
+        # Filter 5: VWAP + ATR
+        vwap_atr_passed, vwap_atr_results = self.apply_vwap_atr_filters(intraday_df)
+        if not vwap_atr_passed:
+            return False, {"stage": "vwap_atr", **liquidity_results, **orb_results, **ema_results, **volume_results, **vwap_atr_results}
 
         # All filters passed
         combined = {
             "symbol": symbol,
             "passed": True,
             **liquidity_results,
-            **technical_results,
-            **vwap_results,
-            **momentum_results,
+            **orb_results,
+            **ema_results,
+            **volume_results,
+            **vwap_atr_results,
         }
 
         return True, combined

@@ -347,37 +347,30 @@ def find_swing_low(df: pd.DataFrame, lookback: int = 10) -> float:
 
 def add_scalping_indicators(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Add scalping-specific indicators to 3-min DataFrame
+    Add scalping-specific indicators for ORB strategy (5-min candles)
 
     Args:
-        df: DataFrame with OHLCV data (3-min candles)
+        df: DataFrame with OHLCV data (5-min candles)
 
     Returns:
         DataFrame with added scalping indicator columns
     """
     df = df.copy()
 
-    # Fast RSI for scalping (3-period)
-    df["rsi_3"] = ta.rsi(df["close"], length=3)
+    # RSI-7 for scalping (more stable than RSI-3)
+    df["rsi_7"] = ta.rsi(df["close"], length=7)
 
-    # EMAs for entries (9 and 20)
+    # Fast EMAs for ORB confirmation (5 and 9)
+    df["ema_5"] = calculate_ema(df, 5)
     df["ema_9"] = calculate_ema(df, 9)
-    df["ema_20"] = calculate_ema(df, 20)
 
-    # VWAP
+    # VWAP for mean reversion
     df["vwap"] = calculate_vwap(df)
 
-    # MACD for momentum
-    macd = ta.macd(df["close"], fast=12, slow=26, signal=9)
-    if macd is not None and not macd.empty:
-        df["macd"] = macd["MACD_12_26_9"]
-        df["macd_signal"] = macd["MACDs_12_26_9"]
-        df["macd_hist"] = macd["MACDh_12_26_9"]
+    # ATR for volatility (shorter period for scalping)
+    df["atr"] = calculate_atr(df, period=10)
 
-    # ATR for volatility
-    df["atr"] = calculate_atr(df, period=14)
-
-    # 20-period volume average
-    df["volume_avg_20"] = df["volume"].rolling(window=20).mean()
+    # 10-period volume average (shorter for quick response)
+    df["volume_avg_10"] = df["volume"].rolling(window=10).mean()
 
     return df

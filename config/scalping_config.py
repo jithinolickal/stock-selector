@@ -4,38 +4,43 @@ from config.base_config import *
 
 # Strategy metadata
 STRATEGY_NAME = "scalping"
-STRATEGY_DESCRIPTION = "Intraday scalping (5-15 min holds) based on 3-min candles"
+STRATEGY_DESCRIPTION = "Intraday scalping (5-15 min holds) based on ORB + 5-min candles"
 TIMEFRAME = "intraday (5-15 minutes)"
 
 # Data fetching configuration
 HISTORICAL_DAYS = 100          # Need less historical data for scalping
-INTRADAY_INTERVAL = "3min"     # 3-min candles for scalping
-INTRADAY_LOOKBACK_CANDLES = 100  # Last 100 x 3-min candles (~5 hours)
+INTRADAY_INTERVAL = "5min"     # 5-min candles (9 candles by 10 AM)
+INTRADAY_LOOKBACK_CANDLES = 50  # Last 50 x 5-min candles (~4 hours)
 
 # Filter thresholds
 FILTER_THRESHOLDS = {
     # Liquidity filters (critical for scalping)
     "MIN_AVG_VOLUME": 2000000,         # Minimum 2M shares daily volume
-    "MAX_SPREAD_PERCENT": 0.1,         # Max 0.1% bid-ask spread
+    "MAX_SPREAD_PERCENT": 0.15,        # Max 0.15% bid-ask spread
 
-    # Technical filters
-    "RSI_PERIOD": 3,                   # Fast RSI for scalping
-    "RSI_OVERSOLD": 20,                # RSI oversold level
-    "RSI_OVERBOUGHT": 80,              # RSI overbought level
-    "EMA_FAST": 9,                     # Fast EMA for entries
-    "EMA_SLOW": 20,                    # Slow EMA for trend
+    # Opening Range Breakout (ORB) settings
+    "ORB_START_TIME": "09:15",         # ORB period start
+    "ORB_END_TIME": "09:30",           # ORB period end (first 15 mins)
+    "ORB_BREAKOUT_MIN_PCT": 0.2,       # Must break ORB by 0.2%
 
-    # VWAP filters
-    "VWAP_DEVIATION_MAX": 0.3,         # Max 0.3% from VWAP for mean reversion
+    # Fast EMA filters (work with 9+ candles)
+    "EMA_FAST": 5,                     # Fast EMA for trend
+    "EMA_SLOW": 9,                     # Slow EMA for confirmation
 
-    # Momentum filters
-    "MIN_VOLUME_SPIKE": 1.5,           # 1.5x volume spike required
-    "MIN_ATR_POINTS": 3,               # Minimum movement potential (points)
+    # RSI (relaxed - not primary filter)
+    "RSI_PERIOD": 7,                   # 7-period RSI (more stable than 3)
+    "RSI_NEUTRAL_MIN": 40,             # Accept neutral range
+    "RSI_NEUTRAL_MAX": 60,             # Not just extremes
 
-    # MACD settings
-    "MACD_FAST": 12,
-    "MACD_SLOW": 26,
-    "MACD_SIGNAL": 9,
+    # VWAP filters (relaxed)
+    "VWAP_DEVIATION_MAX": 0.8,         # Max 0.8% from VWAP
+
+    # Volume filters (shorter average for responsiveness)
+    "MIN_VOLUME_SPIKE": 1.0,           # 1.0x volume (at or above average)
+    "VOLUME_AVG_PERIOD": 10,           # Use last 10 candles (not 20)
+
+    # ATR (relaxed)
+    "MIN_ATR_POINTS": 1.5,             # Minimum movement potential
 }
 
 # Scoring weights (must sum to 100)
