@@ -208,3 +208,13 @@ __marimo__/
 # Project specific
 results/*.json
 !results/.gitkeep
+data/parquet/
+data/instruments.json
+results/*.csv
+results/*.parquet
+results/live/
+results/paper/
+live/STOP
+data/external/
+results/**/*.csv
+results/**/*.log
